@@ -15,7 +15,7 @@ namespace TestObserver
         public void TestAdd()
         {
             var s = ListSubject<int>.Create();
-            Assert.AreEqual(0, s.Data.Count);
+            Assert.AreEqual(0, s.Count);
             Assert.AreEqual(-1, Count);
 
             Observer = new Observer<List<int>>(s, () => OnNotifyGetCount());
@@ -171,6 +171,21 @@ namespace TestObserver
             var item2 = new MyClass("Bob", 456);
 
             var s = ListSubject<MyClass>.Create();
+            s.Add(item1);
+            Assert.AreEqual(0, s.IndexOf(item1));
+
+            s.Add(item2);
+            Assert.AreEqual(0, s.IndexOf(item1));
+            Assert.AreEqual(1, s.IndexOf(item2));
+        }
+
+        [TestMethod]
+        public void TestIndexOfNoHistory()
+        {
+            var item1 = new MyClass("Andy", 123);
+            var item2 = new MyClass("Bob", 456);
+
+            var s = ListSubject<MyClass>.Create(false);
             s.Add(item1);
             Assert.AreEqual(0, s.IndexOf(item1));
 

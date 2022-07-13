@@ -1,6 +1,8 @@
 ﻿using Gradient.ObjectHistory;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 
 namespace Observer
 {
@@ -8,13 +10,19 @@ namespace Observer
     {
         private readonly List<Observer<T>> Observers = new();
 
-        protected Subject(T data)
+        protected Subject(T data, bool withHistory)
         {
-            History = History<T>.Create(data, NullCondition.AllowAll, OnNullError.Ignore);
+            if (data != null && data.GetType() != typeof(string))
+                IsClassOrString = data.GetType().IsClass;
+
+            if (withHistory)
+                History = History<T>.Create(data, NullCondition.AllowAll, OnNullError.Ignore);
+            else
+                Singleton = data;
         }
-        public static Subject<T> Create(T data)
+        public static Subject<T> Create(T data, bool withHistory = true)
         {
-            var subject = new Subject<T>(data);
+            var subject = new Subject<T>(data, withHistory);
             return subject;
         }
 
@@ -33,9 +41,12 @@ namespace Observer
         }
 
         protected History<T> History { get; set; }
+        protected T Singleton { get; set; }
 
         public void Undo(bool suppressNotify = false)
         {
+            if (History == null)
+                throw new NotSupportedException("Cannot undo when there is no history");
             History.Undo();
             if (!suppressNotify)
                 NotifyObservers();
@@ -43,6 +54,8 @@ namespace Observer
 
         public void Redo(bool suppressNotify = false)
         {
+            if (History == null)
+                throw new NotSupportedException("Cannot redo when there is no history");
             History.Redo();
             if (!suppressNotify)
                 NotifyObservers();
@@ -52,16 +65,27 @@ namespace Observer
         {
             get
             {
+                if (History == null)
+                    return Singleton;
                 return History.Value;
             }
             protected set
             {
-                if (History.AddValue(value))
+                if (History == null)
+                {
+                    if (Singleton.Equals(value))
+                        return;
+                    Singleton = value;
+                    NotifyObservers();
+                }
+                else if (History.AddValue(value))
                 {
                     NotifyObservers();
                 }
             }
         }
+
+        public bool IsClassOrString { get; }
 
         public void RegisterObserver(Observer<T> observer)
         {
@@ -92,10 +116,17 @@ namespace Observer
 
         public virtual void Modify(ModifyDelegate modifyDelegate)
         {
-            var previous = History.Value;
-            var copy = previous.DeepCopy();
+            if (!IsClassOrString)
+            {
+                throw new NotSupportedException($"Cannot use Modify({modifyDelegate} if subject is not a class. Use Replace() instead");
+            }
 
-            History.InsertBefore(copy);
+            if (History != null)
+            {
+                var previous = History.Value;
+                var copy = previous.DeepCopy();
+                History.InsertBefore(copy);
+            }
 
             modifyDelegate(Data);
             NotifyObservers();
