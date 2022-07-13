@@ -7,11 +7,11 @@ namespace Observer
 {
     public class ListSubject<T> : Subject<List<T>>, IList<T>
     {
-        protected ListSubject(List<T> data) : base(data) { }
+        protected ListSubject(List<T> data, bool withHistory) : base(data, withHistory) { }
 
-        public static ListSubject<T> Create()
+        public static ListSubject<T> Create(bool withHistory = true)
         {
-            return new ListSubject<T>(new List<T>());
+            return new ListSubject<T>(new List<T>(), withHistory);
         }
 
         public T this[int index]
@@ -37,12 +37,15 @@ namespace Observer
 
         public void Add(T item)
         {
-            var previous = History.Value.ToList();
-            var last = previous.LastOrDefault();
-            if (last != null && !last.Equals(item))
+            if (History != null)
             {
-                var copy = previous.DeepCopy();
-                History.InsertBefore(copy);
+                var previous = History.Value.ToList();
+                var last = previous.LastOrDefault();
+                if (last != null && !last.Equals(item))
+                {
+                    var copy = previous.DeepCopy();
+                    History.InsertBefore(copy);
+                }
             }
             Data.Add(item);
             NotifyObservers();
@@ -92,7 +95,9 @@ namespace Observer
 
         public int IndexOf(T item)
         {
-            return History.Value.IndexOf(item);
+            if (History != null)
+                return History.Value.IndexOf(item);
+            return Singleton.IndexOf(item);
         }
 
         public void Insert(int index, T item)
@@ -122,10 +127,12 @@ namespace Observer
 
         public override void Modify(ModifyDelegate modifyDelegate)
         {
-            var previous = History.Value.ToList();
-            var copy = previous.DeepCopy();
-            History.InsertBefore(copy);
-
+            if (History != null)
+            {
+                var previous = History.Value.ToList();
+                var copy = previous.DeepCopy();
+                History.InsertBefore(copy);
+            }
             modifyDelegate(Data);
             NotifyObservers();
         }
@@ -137,11 +144,7 @@ namespace Observer
 
         public bool IsReadOnly => throw new NotImplementedException();
 
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            throw new NotImplementedException();
-        }
-
+        IEnumerator IEnumerable.GetEnumerator() => throw new NotImplementedException();
     }
 
 }
